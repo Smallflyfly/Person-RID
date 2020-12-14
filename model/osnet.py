@@ -4,7 +4,9 @@
 @author:fangpf
 @time: 2020/12/11
 """
+from collections import OrderedDict
 
+import torch
 import torch.nn as nn
 
 
@@ -169,6 +171,32 @@ class ChannelGate(nn.Module):
         else:
             raise RuntimeError("unknow gate activation: {}".format(gate_activation))
 
+    def forward(self, x):
+        input = x
+        x = self.global_avgpool(x)
+        x = self.fc1(x)
+        if self.norm1:
+            x = self.norm1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        if self.gate_activation:
+            x = self.gate_activation(x)
+        if self.return_gates:
+            return x
+        return input * x
+
+
+class Conv1x1Linear(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(Conv1x1Linear, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, 1, stride=stride, padding=0, bias=False)
+        self.bn = nn.BatchNorm2d(out_channels)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        return x
+
 
 class OSBlock(nn.Module):
     """Omni-scale feature learning block."""
@@ -193,7 +221,48 @@ class OSBlock(nn.Module):
             LightConv3x3(mid_channels, mid_channels)
         )
         self.gate = ChannelGate(mid_channels)
+        self.conv3 = Conv1x1Linear(mid_channels, out_channels)
+        self.downsample = None
+        if in_channels != out_channels:
+            self.downsample = Conv1x1Linear(in_channels, out_channels)
+        self.IN = None
+        if IN:
+            self.IN = nn.InstanceNorm2d(out_channels, affine=True)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        identity = x
+        x1 = self.conv1(x)
+        x2a = self.conv2a(x1)
+        x2b = self.conv2b(x1)
+        x2c = self.conv2c(x1)
+        x2d = self.conv2d(x1)
+        x2 = self.gate(x2a) + self.gate(x2b) + self.gate(x2c) + self.gate(x2d)
+        x3 = self.conv3(x2)
+        if self.downsample:
+            identity = self.downsample(identity)
+        out = x3 + identity
+        if self.IN:
+            out = self.IN(out)
+        out = self.relu(out)
+        return out
 
 
-def osnet_x1_0(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
-    model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock])
+def init_pretrained_weights(model, key, pretrained):
+    state_dict = torch.load(pretrained)
+    model_dict = model.state_dict()
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        k = k.replace('module.', '')
+        if k in model_dict and model_dict[k].size() == v.size():
+            new_state_dict[k] = v
+    model_dict.update(new_state_dict)
+    model.load_state_dict(model_dict)
+
+
+def osnet_x1_0(num_classes=1000, pretrained=None, loss='softmax', **kwargs):
+    model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[2, 2, 2],
+                  channels=[64, 256, 384, 512], loss=loss, **kwargs)
+    if pretrained:
+        init_pretrained_weights(model, 'osnet_x1_0', pretrained)
+    return model
