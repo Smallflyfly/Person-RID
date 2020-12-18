@@ -28,7 +28,6 @@ class DukeMTMCreID(ImageDataset):
     dataset_dir = 'data'
 
     def __init__(self, train, query, gallery, root='', **kwargs):
-        super().__init__(train, query, gallery, **kwargs)
         self.root = os.path.abspath(os.path.expanduser(root))
         self.dataset_dir = os.path.join(self.root, self.dataset_dir)
         self.train_dir = os.path.join(os.path.join(self.dataset_dir, 'DukeMTMC-reID'), 'bounding_box_train')
@@ -38,9 +37,27 @@ class DukeMTMCreID(ImageDataset):
         self.check_before_run(required_files)
         train = self.process_dir(self.train_dir, relabel=True)
         query = self.process_dir(self.query_dir, relabel=False)
-        gallery = self.process_dir(self.gallery_dirm, relabel=False)
-
+        gallery = self.process_dir(self.gallery_dir, relabel=False)
+        super(DukeMTMCreID).__init__(train, query, gallery, **kwargs)
 
     def process_dir(self, dir_path, relabel=False):
-        img_path = glob(os.path.join(dir_path, '*.jpg'))
+        img_paths = glob(os.path.join(dir_path, '*.jpg'))
         pattern = re.compile(r'([-\d]+)_c(\d)')
+
+        pid_container = set()
+        for img_path in img_paths:
+            pid, _ = map(int, pattern.search(img_path).groups())
+            pid_container.add(pid)
+        pid2label = {pid: label for label, pid in enumerate(pid_container)}
+
+        data = []
+        for img_path in img_paths:
+            pid, camid = map(int, pattern.search(img_path).groups())
+            assert 1 <= camid <= 8
+            # index starts from 0
+            camid -= 1
+            if relabel:
+                pid = pid2label[pid]
+            data.append((img_path, pid, camid))
+
+        return data

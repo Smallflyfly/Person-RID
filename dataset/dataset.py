@@ -13,7 +13,7 @@ import tarfile
 import zipfile
 import torch
 
-from torchreid.utils import read_image, download_url, mkdir_if_missing
+from utils.tools import mkdir_if_missing, download_url, read_image
 
 
 class Dataset(object):
