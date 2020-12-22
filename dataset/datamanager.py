@@ -2,13 +2,15 @@ from __future__ import division, print_function, absolute_import
 import torch
 
 from dataset.dukemtmc_dataset import DukeMTMCreID
+from dataset.market1501 import Market1501
 from dataset.sampler import build_train_sampler
 from dataset.transforms import build_transforms
 
 
-def init_image_dataset(**kwargs):
+def init_image_dataset(name, **kwargs):
 
-    return DukeMTMCreID(**kwargs)
+    # return DukeMTMCreID(**kwargs)
+    return Market1501(**kwargs)
 
 
 class DataManager(object):

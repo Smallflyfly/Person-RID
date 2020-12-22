@@ -12,15 +12,15 @@ def get_default_config():
 
     # model
     cfg.model = CN()
-    cfg.model.name = 'resnet50'
+    cfg.model.name = 'osnet_x1_0'
     cfg.model.pretrained = True  # automatically load pretrained model weights if available
-    cfg.model.load_weights = ''  # path to model weights
+    cfg.model.load_weights = './weights/pretrained/osnet_x1_0_imagenet.pth'  # path to model weights
     cfg.model.resume = ''  # path to checkpoint for resume training
 
     # data
     cfg.data = CN()
     cfg.data.type = 'image'
-    cfg.data.root = 'reid-data'
+    cfg.data.root = 'data'
     cfg.data.sources = ['market1501']
     cfg.data.targets = ['market1501']
     cfg.data.workers = 4  # number of data loading workers

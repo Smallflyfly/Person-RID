@@ -21,13 +21,13 @@ train:
   optim: 'amsgrad'
   lr: 0.0015
   max_epoch: 250
-  batch_size: 64
+  batch_size: 8
   fixbase_epoch: 10
   open_layers: ['classifier']
   lr_scheduler: 'cosine'
 
 test:
-  batch_size: 300
+  batch_size: 16
   dist_metric: 'euclidean'
   normalize_feature: False
   evaluate: False

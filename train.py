@@ -61,6 +61,8 @@ def train(cfg):
     model = model.cuda()
     optimizer = build_optimizer(model, **optimizer_kwargs(cfg))
     scheduler = build_scheduler(optimizer, **lr_scheduler_kwargs(cfg))
+
+    # print(model)
     engine = build_engine(cfg, data_manager, model, optimizer, scheduler)
     engine.run(**engine_run_kwargs(cfg))
 

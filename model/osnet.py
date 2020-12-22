@@ -37,7 +37,7 @@ class ConvLayer(nn.Module):
             groups=1,
             IN=False
     ):
-        super(ConvLayer).__init__()
+        super(ConvLayer, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, bias=False,
                               groups=groups)
         if IN:
@@ -80,9 +80,9 @@ class OSNet(nn.Module):
     ):
         super(OSNet, self).__init__()
         num_blocks = len(blocks)
+        self.loss = loss
         assert num_blocks == len(layers)
         assert num_blocks == len(channels) - 1
-
         # backbone
         self.conv1 = ConvLayer(3, channels[0], 7, stride=2, padding=3, IN=IN)
         self.maxpool = nn.MaxPool2d(3, stride=2, padding=1)
@@ -117,7 +117,7 @@ class OSNet(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias:
+                if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
@@ -129,6 +129,32 @@ class OSNet(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
+
+    def featuremaps(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.conv4(x)
+        x = self.conv5(x)
+        return x
+
+    def forward(self, x, return_featuremaps=False):
+        x = self.featuremaps(x)
+        if return_featuremaps:
+            return x
+        v = self.global_avgpool(x)
+        v = v.view(v.size(0), -1)
+        if self.fc is not None:
+            v = self.fc(v)
+        if not self.training:
+            return v
+        y = self.classifier(v)
+        if self.loss == 'softmax':
+            return y
+        elif self.loss == 'triplet':
+            return y, v
+        else:
+            raise RuntimeError("错误损失函数")
 
 
 class LightConv3x3(nn.Module):
@@ -260,9 +286,9 @@ def init_pretrained_weights(model, key, pretrained):
     model.load_state_dict(model_dict)
 
 
-def osnet_x1_0(num_classes=1000, pretrained=None, loss='softmax', **kwargs):
+def osnet_x1_0(num_classes=1000, pretrained=True, loss='softmax', **kwargs):
     model = OSNet(num_classes, blocks=[OSBlock, OSBlock, OSBlock], layers=[2, 2, 2],
                   channels=[64, 256, 384, 512], loss=loss, **kwargs)
     if pretrained:
-        init_pretrained_weights(model, 'osnet_x1_0', pretrained)
+        init_pretrained_weights(model, 'osnet_x1_0', './weights/pretrained/osnet_x1_0_imagenet.pth')
     return model
